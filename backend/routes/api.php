@@ -15,11 +15,18 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::post('test-login', function () {
-    return response()->json(['message' => 'Test POST OK'], 200);
-});
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
     Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
+});
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+    Route::get('/auth/check-auth', [AuthController::class, 'checkAuth'])->name('auth.check');
+    Route::get('/auth/profile', [AuthController::class, 'getProfile']);
+    Route::get('/auth/orders', [AuthController::class, 'getOrders']);
+    Route::get('/auth/shipping-addresses', [AuthController::class, 'getShippingAddress']);
+    Route::post('/auth/shipping-addresses', [AuthController::class, 'addShippingAddress']);
+    Route::put('/auth/shipping-addresses/{id}', [AuthController::class, 'updateShippingAddress']);
+    Route::delete('/auth/shipping-addresses/{id}', [AuthController::class, 'deleteShippingAddress']);
 });

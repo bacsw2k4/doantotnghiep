@@ -114,7 +114,7 @@ class AuthController extends Controller
         $address = ShippingAddress::where('user_id', auth()->id())->first();
         return response()->json([
             'success' => true,
-            'address' => ShippingAddressResource::collection($address)
+            'address' => new ShippingAddressResource($address)
         ]);
     }
     public function addShippingAddress(AddShippingAddressRequest $request)
