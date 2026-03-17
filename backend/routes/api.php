@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -29,4 +30,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/shipping-addresses', [AuthController::class, 'addShippingAddress']);
     Route::put('/auth/shipping-addresses/{id}', [AuthController::class, 'updateShippingAddress']);
     Route::delete('/auth/shipping-addresses/{id}', [AuthController::class, 'deleteShippingAddress']);
+    //Banner
+    Route::prefix('banners')->group(function () {
+        Route::get('/', [BannerController::class, 'index'])->name('banners.index');
+        Route::post('/', [BannerController::class, 'store'])->name('banners.store');
+        Route::get('/{id}', [BannerController::class, 'show'])->name('banners.show');
+        Route::put('/{id}', [BannerController::class, 'update'])->name('banners.update');
+        Route::delete('/{id}', [BannerController::class, 'destroy'])->name('banners.destroy');
+    });
 });
