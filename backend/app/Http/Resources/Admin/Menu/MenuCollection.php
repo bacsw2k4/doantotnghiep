@@ -14,6 +14,16 @@ class MenuCollection extends ResourceCollection
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'data' => MenuResource::collection($this->collection),
+            'meta' => [
+                'current_page' => $this->currentPage(),
+                'last_page'    => $this->lastPage(),
+                'per_page'     => (int) $this->perPage(),
+                'total'        => $this->total(),
+                'from'         => $this->firstItem(),
+                'to'           => $this->lastItem(),
+            ]
+        ];
     }
 }

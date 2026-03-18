@@ -22,7 +22,14 @@ class StoreVoucherRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'code'      => 'required|string|max:50|unique:vouchers,code',
+            'name'      => 'required|string|max:255',
+            'image'     => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'type'      => 'required|in:percentage,fixed',
+            'discount'  => 'required|numeric|min:0',
+            'minmoney'  => 'nullable|numeric|min:0',
+            'status'    => 'nullable|in:active,inactive',
+            'enddate'   => 'nullable|date|after_or_equal:today',
         ];
     }
 }
