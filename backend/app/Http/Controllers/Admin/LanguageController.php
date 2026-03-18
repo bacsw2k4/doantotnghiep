@@ -43,11 +43,14 @@ class LanguageController extends Controller
     {
         try {
             DB::beginTransaction();
+
             $data = $request->only(([
                 'name',
                 'desc',
                 'order',
                 'status',
+                'image'
+
             ]));
             if ($request->hasFile('image')) {
                 $file = $request->file('image');
@@ -56,7 +59,8 @@ class LanguageController extends Controller
                 $data['image'] = '/storage/' . $path;
             }
             $languages = Language::create($data);
-            Log::add($request, 'language created', 'craete', "tao ngon ngu :{$languages->name}");
+
+            Log::add($request, 'language created', 'create', "tao ngon ngu :{$languages->name}");
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -95,9 +99,10 @@ class LanguageController extends Controller
                 'name',
                 'desc',
                 'order',
-                'status'
+                'status',
+                'image'
             ]);
-            if ($request->hasFile('image')) {
+            if ($request->file('image')) {
                 if ($language->image && Storage::disk('public')->exists(str_replace('/storage/', '', $language->image))) {
                     Storage::disk('public')->delete(str_replace('/storage/', '', $language->image));
                 }
