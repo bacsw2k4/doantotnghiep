@@ -1,9 +1,19 @@
 <?php
 
+use App\Http\Controllers\Admin\AttributeController;
 use App\Http\Controllers\Admin\BannerController;
+use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\LanguageItemController;
 use App\Http\Controllers\Admin\LanguageKeyController;
+use App\Http\Controllers\Admin\MenuController;
+use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\PromotionSubscriberController;
+use App\Http\Controllers\Admin\ReviewController;
+use App\Http\Controllers\Admin\ReviewReplyController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -68,5 +78,100 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/', [LanguageItemController::class, 'update'])->name('language-items.update');
         Route::delete('/{id}', [LanguageItemController::class, 'destroy'])->name('language-items.destroy');
         Route::post('/delete-multiple', [LanguageItemController::class, 'deleteMultiple'])->name('language-items.deleteMultiple');
+    });
+    // Roles
+    Route::prefix('roles')->group(function () {
+        Route::get('/', [RoleController::class, 'index'])->name('roles.index');
+        Route::post('/', [RoleController::class, 'store'])->name('roles.store');
+        Route::get('/{id}', [RoleController::class, 'show'])->name('roles.show');
+        Route::put('/{id}', [RoleController::class, 'update'])->name('roles.update');
+        Route::delete('/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
+        Route::post('/delete-multiple', [RoleController::class, 'destroyMultiple'])->name('roles.destroyMultiple');
+    });
+    // Users
+    Route::prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index'])->name('users.index');
+        Route::post('/', [UserController::class, 'store'])->name('users.store');
+        Route::get('/{id}', [UserController::class, 'show'])->name('users.show');
+        Route::put('/{id}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+        Route::post('/delete-multiple', [UserController::class, 'destroyMultiple'])->name('users.destroyMultiple');
+    });
+    Route::post('/promotion-subscribers/send-email', [PromotionSubscriberController::class, 'sendEmail']);
+    // Attributes
+    Route::prefix('attributes')->group(function () {
+        Route::get('/', [AttributeController::class, 'index'])->name('attributes.index');
+        Route::post('/', [AttributeController::class, 'store'])->name('attributes.store');
+        Route::get('/max-order', [AttributeController::class, 'getMaxOrder']);
+        Route::get('/{id}', [AttributeController::class, 'show'])->name('attributes.show');
+        Route::put('/{id}', [AttributeController::class, 'update'])->name('attributes.update');
+        Route::delete('/{id}', [AttributeController::class, 'destroy'])->name('attributes.destroy');
+        Route::post('/delete-multiple', [AttributeController::class, 'destroyMultiple'])->name('attributes.destroyMultiple');
+        Route::get('/{id}/children', [AttributeController::class, 'getChildren'])->name('attributes.children');
+        Route::get('/tree/full', [AttributeController::class, 'getFullTree'])->name('attributes.tree.full');
+    });
+    Route::prefix('menus')->group(function () {
+        Route::get('/', [MenuController::class, 'index'])->name('menus.index');
+        Route::post('/', [MenuController::class, 'store'])->name('menus.store');
+        Route::get('/dropdown', [MenuController::class, 'getAllForDropdown']);
+        Route::get('/max-order', [MenuController::class, 'getMaxOrder']);
+        Route::get('/children/{id}', [MenuController::class, 'getChildren']);
+        Route::get('/{id}', [MenuController::class, 'show'])->name('menus.show');
+        Route::put('/{id}', [MenuController::class, 'update'])->name('menus.update');
+        Route::delete('/{id}', [MenuController::class, 'destroy'])->name('menus.destroy');
+        Route::post('/delete-multiple', [MenuController::class, 'destroyMultiple'])->name('menus.destroyMultiple');
+    });
+    // Categories
+    Route::prefix('categories')->group(function () {
+        Route::get('/', [CategoryController::class, 'index'])->name('categories.index');
+        Route::post('/', [CategoryController::class, 'store'])->name('categories.store');
+        Route::get('/{category}', [CategoryController::class, 'show'])->name('categories.show');
+        Route::put('/{category}', [CategoryController::class, 'update'])->name('categories.update');
+        Route::delete('/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy');
+        Route::post('/delete-multiple', [CategoryController::class, 'destroyMultiple'])->name('categories.destroyMultiple');
+    });
+    // Promotion Subscriber
+    Route::prefix('promotion-subscribers')->group(function () {
+        Route::get('/', [PromotionSubscriberController::class, 'index'])->name('promotion-subscribers.index');
+        Route::post('/', [PromotionSubscriberController::class, 'store'])->name('promotion-subscribers.store');
+        Route::get('/{promotionSubscriber}', [PromotionSubscriberController::class, 'show'])->name('promotion-subscribers.show');
+        Route::put('/{promotionSubscriber}', [PromotionSubscriberController::class, 'update'])->name('promotion-subscribers.update');
+        Route::delete('/{promotionSubscriber}', [PromotionSubscriberController::class, 'destroy'])->name('promotion-subscribers.destroy');
+        Route::post('/delete-multiple', [PromotionSubscriberController::class, 'destroyMultiple'])->name('promotion-subscribers.destroyMultiple');
+    });
+    // Products
+    Route::prefix('products')->group(function () {
+        Route::get('/', [ProductController::class, 'index'])->name('products.index');
+        Route::post('/', [ProductController::class, 'store'])->name('products.store');
+        Route::get('/{slug}', [ProductController::class, 'show'])->name('products.show');
+        Route::put('/{id}', [ProductController::class, 'update'])->name('products.update');
+        Route::delete('/{id}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::post('/delete-multiple', [ProductController::class, 'destroyMultiple'])->name('products.destroyMultiple');
+    });
+    // Vouchers
+    Route::prefix('vouchers')->group(function () {
+        Route::get('/', [VoucherController::class, 'index'])->name('vouchers.index');
+        Route::post('/', [VoucherController::class, 'store'])->name('vouchers.store');
+        Route::get('/{id}', [VoucherController::class, 'show'])->name('vouchers.show');
+        Route::put('/{id}', [VoucherController::class, 'update'])->name('vouchers.update');
+        Route::delete('/{id}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
+        Route::post('/delete-multiple', [VoucherController::class, 'destroyMultiple'])->name('vouchers.destroyMultiple');
+    });
+    // Review management
+    Route::prefix('reviews')->group(function () {
+        Route::get('/', [ReviewController::class, 'index']);
+        Route::get('/pending', [ReviewController::class, 'getPendingReviews']);
+        Route::get('/statistics', [ReviewController::class, 'statistics']);
+        Route::get('/{id}', [ReviewController::class, 'show']);
+        Route::put('/{id}/status', [ReviewController::class, 'updateStatus']);
+        Route::delete('/{id}', [ReviewController::class, 'destroy']);
+    });
+
+    // Reply management
+    Route::prefix('reviews')->group(function () {
+        Route::get('/{reviewId}/replies', [ReviewReplyController::class, 'getReplies']);
+        Route::post('/{reviewId}/replies', [ReviewReplyController::class, 'store']);
+        Route::put('/replies/{id}', [ReviewReplyController::class, 'update']);
+        Route::delete('/replies/{id}', [ReviewReplyController::class, 'destroy']);
     });
 });
