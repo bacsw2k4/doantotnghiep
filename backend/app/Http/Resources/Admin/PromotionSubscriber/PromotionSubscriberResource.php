@@ -7,13 +7,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PromotionSubscriberResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
+
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'email' => $this->email,
+            'status' => $this->status,
+            'subscribed_at' => $this->subscribed_at?->toDateTimeString(),
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
+        ];
     }
 }

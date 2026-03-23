@@ -4,13 +4,13 @@ namespace App\Http\Requests\Admin\PromotionSubscriber;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StorePromotionSubcriberRequest extends FormRequest
+class UpdatePromotionSubscriberRequest extends FormRequest
 {
 
     public function rules(): array
     {
         return [
-            'email' => 'required|email|max:255|unique:promotion_subscribers,email',
+            'email' => 'sometimes|required|email|max:255|unique:promotion_subscribers,email,' . $this->promotionSubscriber->id,
             'status' => 'nullable|in:active,inactive',
         ];
     }
