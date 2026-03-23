@@ -6,23 +6,21 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreCategoryRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        return false;
-    }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
-            //
+            'lang_id'    => 'nullable|exists:languages,id',
+            'name'       => 'required|string|max:255|unique:categories,name',
+            'desc'       => 'nullable|string',
+            'content'    => 'nullable|string',
+            'seotitle'   => 'nullable|string|max:255',
+            'seodesc'    => 'nullable|string',
+            'url'        => 'nullable|string|max:255',
+            'image'      => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'attribute'  => 'nullable|string',
+            'order'      => 'nullable|integer',
+            'status'     => 'nullable|in:active,inactive',
         ];
     }
 }
