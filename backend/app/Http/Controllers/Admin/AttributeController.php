@@ -68,7 +68,7 @@ class AttributeController extends Controller
             ]
         ]);
     }
-
+    //convert img de Fe goi duoc luon
     private function convertImageUrls($attributes)
     {
         foreach ($attributes as $attribute) {
@@ -148,20 +148,26 @@ class AttributeController extends Controller
             ], 500);
         }
     }
+    //// Xây dựng cây từ danh sách phẳng
     private function buildTree($items, $parentId = null)
     {
+        /// Mảng chứa các node con của parent hiện tại
         $branch = [];
-
+        // Duyệt toàn bộ danh sách item
         foreach ($items as $item) {
+            // Nếu item là con của parent hiện tại
             if ($item->parentid == $parentId) {
+                //Gọi đệ quy để tìm các con của item hiện tại
                 $children = $this->buildTree($items, $item->id);
+                //Nếu item có con thì gán vào children
                 if (!empty($children)) {
                     $item->children = $children;
                 }
+                //Thêm item vào danh sách con
                 $branch[] = $item;
             }
         }
-
+        //Trả về danh sách node con của parent hiện tại
         return $branch;
     }
 
@@ -371,7 +377,7 @@ class AttributeController extends Controller
                 'lang_id' => 'required|exists:languages,id'
             ]);
 
-            FacadesLog::info('dóudousd');
+            FacadesLog::info('buihobac');
 
             $query = Attribute::where('lang_id', $request->lang_id);
 
@@ -399,7 +405,7 @@ class AttributeController extends Controller
             ], 500);
         }
     }
-
+    //chống lặp vô hạn 
     private function causesCycle($id, $parentId)
     {
         if ($parentId === null) {
