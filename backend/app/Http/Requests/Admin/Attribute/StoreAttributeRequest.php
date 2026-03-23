@@ -11,7 +11,7 @@ class StoreAttributeRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -22,7 +22,14 @@ class StoreAttributeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'lang_id'  => 'required|exists:languages,id',
+            'parentid' => 'nullable|exists:attributes,id',
+            'name'     => 'required|string|max:255',
+            'type'     => 'nullable|string|max:50',
+            'color'    => 'nullable|string|max:50',
+            'image'    => 'nullable',
+            'order'    => 'nullable|integer',
+            'status'   => 'nullable|in:active,inactive',
         ];
     }
 }
