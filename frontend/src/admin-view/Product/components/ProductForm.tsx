@@ -1,0 +1,1096 @@
+import { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate, useOutletContext } from "react-router-dom";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue
+} from "@/components/ui/select";
+import { toast } from "react-toastify";
+import axios from "axios";
+import { useForm, useFieldArray } from "react-hook-form";
+import { Badge } from "@/components/ui/badge";
+import {
+	Plus,
+	Trash2,
+	ArrowLeft,
+	Save,
+	Palette,
+	Layers,
+	Upload
+} from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
+
+interface Product {
+	id: number;
+	lang_id: number;
+	name: string;
+	desc?: string;
+	content?: string;
+	image?: string;
+	attribute?: string;
+	url?: string;
+	author?: string;
+	seotitle?: string;
+	seodesc?: string;
+	price?: number;
+	saleprice?: number;
+	order: number;
+	status: string;
+	categories?: Category[];
+	subProducts?: SubProduct[];
+}
+
+interface Category {
+	id: number;
+	name: string;
+	lang_id: number;
+	attribute?: string;
+}
+
+interface SubProduct {
+	id?: number;
+	product_id?: number;
+	title?: string;
+	image: string;
+}
+
+interface Attribute {
+	id: number;
+	name: string;
+	lang_id: number;
+	parentid?: number | null;
+	type?: string;
+}
+
+interface Language {
+	id: number;
+	name: string;
+}
+
+interface LayoutContext {
+	selectedLangId: number;
+	languages: Language[];
+}
+
+interface ProductFormData {
+	id?: number;
+	lang_id: number;
+	name: string;
+	desc: string;
+	content: string;
+	image: File | string | null;
+	attribute: string;
+	url: string;
+	author: string;
+	seotitle: string;
+	seodesc: string;
+	price: number;
+	saleprice: number;
+	order: number;
+	status: string;
+	categories: number[];
+	subProducts: Array<{
+		id?: number;
+		title: string;
+		image: File | string | null;
+	}>;
+}
+
+const api = axios.create({
+	baseURL: "http://localhost:8000/api/",
+	headers: {
+		Authorization: `Bearer ${localStorage.getItem("token")}`
+	}
+});
+
+api.interceptors.request.use(
+	(config) => {
+		const token = localStorage.getItem("token");
+		if (token) {
+			config.headers.Authorization = `Bearer ${token}`;
+		}
+		return config;
+	},
+	(error) => Promise.reject(error)
+);
+
+// Hàm chuyển đổi tiếng Việt không dấu thành slug
+const convertToSlug = (str: string): string => {
+	if (!str) return '';
+	
+	// Chuyển thành chữ thường
+	str = str.toLowerCase();
+	
+	// Xóa dấu tiếng Việt
+	str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+	
+	// Thay thế các ký tự đặc biệt
+	str = str.replace(/[đĐ]/g, "d");
+	str = str.replace(/[^a-z0-9\s-]/g, "");
+	str = str.replace(/\s+/g, "-");
+	str = str.replace(/-+/g, "-");
+	str = str.replace(/^-+|-+$/g, ""); // Xóa dấu gạch ngang ở đầu và cuối
+	
+	return str;
+};
+
+const ProductForm = () => {
+	const { id } = useParams<{ id: string }>();
+	const navigate = useNavigate();
+	const { selectedLangId, languages } = useOutletContext<LayoutContext>();
+	const [loading, setLoading] = useState(false);
+	const [categories, setCategories] = useState<Category[]>([]);
+	const [attributes, setAttributes] = useState<Attribute[]>([]);
+	const [attributesLoaded, setAttributesLoaded] = useState(false);
+	const [isUrlManuallyEdited, setIsUrlManuallyEdited] = useState(false);
+	const isEditing = !!id;
+
+	const { register, handleSubmit, control, reset, setValue, watch } =
+		useForm<ProductFormData>({
+			defaultValues: {
+				lang_id: selectedLangId,
+				name: "",
+				desc: "",
+				content: "",
+				image: null,
+				attribute: JSON.stringify({ attribute_ids: [] }),
+				url: "",
+				author: "",
+				seotitle: "",
+				seodesc: "",
+				price: 0,
+				saleprice: 0,
+				order: 0,
+				status: "active",
+				categories: [],
+				subProducts: [{ title: "", image: null }]
+			}
+		});
+
+	const { fields, append, remove, replace } = useFieldArray({
+		control,
+		name: "subProducts"
+	});
+
+	const modules = {
+		toolbar: {
+			container: [
+				[{ header: [1, 2, false] }],
+				["bold", "italic", "underline", "strike", "blockquote"],
+				[{ list: "ordered" }, { list: "bullet" }],
+				["link", "image"],
+				[{ align: [] }],
+				[{ color: [] }, { background: [] }],
+				[{ font: [] }],
+				[{ size: ["small", false, "large", "huge"] }],
+				["clean"]
+			]
+		}
+	};
+
+	// Theo dõi thay đổi của tên sản phẩm để tự động tạo URL
+	useEffect(() => {
+		if (isEditing && id) {
+			setIsUrlManuallyEdited(false);
+		}
+	}, [isEditing, id]);
+
+	useEffect(() => {
+		const subscription = watch((value, { name, type }) => {
+			if (name === 'name' && type === 'change') {
+				const productName = value.name || '';
+				
+				if (productName.trim() && !isUrlManuallyEdited && !isEditing) {
+					// Tự động tạo URL khi tạo mới sản phẩm
+					const autoGeneratedUrl = convertToSlug(productName);
+					setValue('url', autoGeneratedUrl);
+				}
+			}
+			
+			if (name === 'url') {
+				// Nếu người dùng tự chỉnh sửa URL, đánh dấu đã chỉnh sửa thủ công
+				if (type === 'change') {
+					const currentName = watch('name') || '';
+					const autoUrl = convertToSlug(currentName);
+					const currentUrl = value.url || '';
+					
+					if (currentUrl !== autoUrl) {
+						setIsUrlManuallyEdited(true);
+					}
+				}
+			}
+		});
+		
+		return () => subscription.unsubscribe();
+	}, [watch, setValue, isUrlManuallyEdited, isEditing]);
+
+	const fetchCategories = async () => {
+		try {
+			const res = await api.get(`/categories?lang_id=${selectedLangId}`);
+			setCategories(res.data.data || []);
+		} catch {
+			toast.error("Không lấy được danh sách danh mục");
+		}
+	};
+
+	const fetchAttributes = async () => {
+		try {
+			const res = await api.get(`/attributes?lang_id=${selectedLangId}`);
+			const fetched = res.data.data.data || [];
+			const filtered = fetched.filter(
+				(attr: Attribute) => attr.lang_id === selectedLangId
+			);
+			setAttributes(filtered);
+			setAttributesLoaded(true);
+		} catch {
+			toast.error("Không lấy được danh sách thuộc tính");
+			setAttributesLoaded(true);
+		}
+	};
+
+	const fetchProduct = async () => {
+		if (!id || !attributesLoaded) return;
+
+		setLoading(true);
+		try {
+			const res = await api.get(`/products/${id}`);
+			const product: Product = res.data.data;
+
+			const attributeIds = product.attribute
+				? JSON.parse(product.attribute).attribute_ids
+				: [];
+
+			const subProdData =
+				product.subProducts?.map((sub) => ({
+					id: sub.id,
+					title: sub.title || "",
+					image: sub.image || null
+				})) || [];
+
+			// Reset toàn bộ form trước
+			reset({
+				id: product.id,
+				lang_id: product.lang_id,
+				name: product.name,
+				desc: product.desc || "",
+				content: product.content || "",
+				image: product.image || null,
+				attribute: JSON.stringify({ attribute_ids: attributeIds }),
+				url: product.url || "",
+				author: product.author || "",
+				seotitle: product.seotitle || "",
+				seodesc: product.seodesc || "",
+				price: product.price || 0,
+				saleprice: product.saleprice || 0,
+				order: product.order,
+				status: product.status,
+				categories:
+					product.categories
+						?.filter((c) => c.lang_id === selectedLangId)
+						.map((c) => c.id) || [],
+				subProducts:
+					subProdData.length > 0 ? subProdData : [{ title: "", image: null }]
+			});
+
+			// Khởi tạo trạng thái chỉnh sửa URL
+			setIsUrlManuallyEdited(!!product.url);
+
+			if (subProdData.length === 0) {
+				replace([{ title: "", image: null }]);
+			}
+		} catch (err: any) {
+			const message =
+				err.response?.status === 404
+					? "Sản phẩm không tồn tại"
+					: err.response?.status === 401
+					? "Phiên đăng nhập hết hạn"
+					: "Không lấy được thông tin sản phẩm";
+			toast.error(message);
+			navigate("/admin/products");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		const loadData = async () => {
+			await Promise.all([fetchCategories(), fetchAttributes()]);
+			if (isEditing) fetchProduct();
+		};
+		loadData();
+	}, [id, selectedLangId]);
+
+	useEffect(() => {
+		if (attributesLoaded && isEditing) {
+			fetchProduct();
+		}
+	}, [attributesLoaded]);
+
+	useEffect(() => {
+		const currentCategories = watch("categories") || [];
+		const validCategories = currentCategories.filter((catId) =>
+			categories.find((c) => c.id === catId && c.lang_id === selectedLangId)
+		);
+		setValue("categories", validCategories);
+
+		const currentAttributeIds = watch("attribute")
+			? JSON.parse(watch("attribute")).attribute_ids
+			: [];
+		const validAttributeIds = currentAttributeIds.filter((attrId: number) =>
+			attributes.find((a) => a.id === attrId)
+		);
+		setValue("attribute", JSON.stringify({ attribute_ids: validAttributeIds }));
+	}, [selectedLangId, categories, attributes]);
+
+	const getAvailableAttributes = () => {
+		const selectedCategories = watch("categories") || [];
+		if (selectedCategories.length === 0) return [];
+
+		const validAttributeIds = categories
+			.filter(
+				(c) => selectedCategories.includes(c.id) && c.lang_id === selectedLangId
+			)
+			.flatMap((c) =>
+				c.attribute
+					? c.attribute
+							.split(",")
+							.map(Number)
+							.filter((id) => !isNaN(id))
+					: []
+			);
+
+		return attributes.filter((attr) => validAttributeIds.includes(attr.id));
+	};
+
+	const handleAttributeChange = (attrId: number) => {
+		const current = watch("attribute")
+			? JSON.parse(watch("attribute")).attribute_ids
+			: [];
+		if (current.includes(attrId)) {
+			setValue(
+				"attribute",
+				JSON.stringify({
+					attribute_ids: current.filter((id: number) => id !== attrId)
+				})
+			);
+		} else {
+			setValue(
+				"attribute",
+				JSON.stringify({ attribute_ids: [...current, attrId] })
+			);
+		}
+	};
+
+	const onSubmit = async (data: ProductFormData) => {
+		if (!data.name?.trim()) {
+			toast.error("Tên sản phẩm là bắt buộc");
+			return;
+		}
+		if (!data.categories || data.categories.length === 0) {
+			toast.error("Vui lòng chọn ít nhất một danh mục");
+			return;
+		}
+
+		setLoading(true);
+		try {
+			const formData = new FormData();
+
+			// Thêm các trường cơ bản
+			const basicFields = [
+				"lang_id",
+				"name",
+				"desc",
+				"content",
+				"attribute",
+				"url",
+				"author",
+				"seotitle",
+				"seodesc",
+				"price",
+				"saleprice",
+				"order",
+				"status"
+			];
+
+			basicFields.forEach((key) => {
+				const value = data[key as keyof ProductFormData];
+				if (value !== null && value !== undefined) {
+					formData.append(key, value.toString());
+				}
+			});
+
+			// Ảnh chính
+			if (data.image instanceof File) {
+				formData.append("image", data.image);
+			} else if (typeof data.image === "string" && data.image === "") {
+				formData.append("image", ""); // gửi rỗng để backend xóa ảnh cũ
+			}
+
+			// Danh mục
+			data.categories.forEach((catId) =>
+				formData.append("categories[]", catId.toString())
+			);
+
+			// Sub products
+			data.subProducts.forEach((sub, index) => {
+				const subProductData: any = {};
+
+				// Chỉ gửi ID khi đang chỉnh sửa bản ghi cũ
+				if (isEditing && sub.id) {
+					subProductData.id = sub.id;
+				}
+
+				// Luôn thêm title (có thể rỗng)
+				subProductData.title = sub.title || "";
+
+				// Xử lý ảnh
+				if (sub.image instanceof File) {
+					// Có file mới - gửi file
+					formData.append(`sub_images[${index}]`, sub.image);
+					subProductData.image = "new"; // đánh dấu có ảnh mới
+				} else if (sub.image === "") {
+					// Xóa ảnh cũ
+					subProductData.image = "";
+				} else if (typeof sub.image === "string" && sub.image) {
+					// Giữ nguyên ảnh cũ
+					subProductData.image = sub.image;
+				}
+
+				// Gửi dữ liệu subproduct
+				formData.append(
+					`sub_products[${index}]`,
+					JSON.stringify(subProductData)
+				);
+			});
+
+			if (isEditing && data.id) {
+				await api.post(`/products/${data.id}?_method=PUT`, formData, {
+					headers: { "Content-Type": "multipart/form-data" }
+				});
+				toast.success("Cập nhật sản phẩm thành công");
+			} else {
+				await api.post("/products", formData, {
+					headers: { "Content-Type": "multipart/form-data" }
+				});
+				toast.success("Tạo sản phẩm thành công");
+			}
+			navigate("/admin/products");
+		} catch (err: any) {
+			console.error("Submit Error:", err.response?.data || err.message);
+			toast.error(err.response?.data?.message || "Lỗi khi lưu sản phẩm");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleAddSubProduct = () => {
+		append({ title: "", image: null });
+	};
+
+	const ImagePreview = ({
+		src,
+		onChange,
+		onRemove
+	}: {
+		src: File | string | null;
+		onChange: (file: File | null) => void;
+		onRemove?: () => void;
+	}) => {
+		const [previewUrl, setPreviewUrl] = useState<string>("");
+		const fileInputRef = useRef<HTMLInputElement>(null);
+
+		useEffect(() => {
+			if (src instanceof File && src) {
+				const url = URL.createObjectURL(src);
+				setPreviewUrl(url);
+				return () => URL.revokeObjectURL(url);
+			} else if (typeof src === "string" && src.trim()) {
+				let imagePath = src.trim();
+				const fullUrl = imagePath.startsWith("http")
+					? imagePath
+					: `http://localhost:8000/storage/${imagePath}`;
+				setPreviewUrl(fullUrl);
+			} else {
+				setPreviewUrl("");
+			}
+		}, [src]);
+
+		const handleOpenPicker = () => fileInputRef.current?.click();
+
+		const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+			const file = e.target.files?.[0];
+			if (!file) return;
+
+			if (!file.type.startsWith("image/")) {
+				toast.error("Vui lòng chọn file ảnh hợp lệ");
+				return;
+			}
+			if (file.size > 10 * 1024 * 1024) {
+				toast.error("Ảnh không được quá 10MB");
+				return;
+			}
+
+			onChange(file);
+			if (e.target) e.target.value = "";
+		};
+
+		const handleRemove = () => {
+			onChange(null);
+			onRemove?.();
+			setPreviewUrl("");
+		};
+
+		return (
+			<div className="space-y-4">
+				{previewUrl ? (
+					<div className="relative rounded-lg overflow-hidden border-2 border-dashed border-muted group">
+						<img
+							src={previewUrl}
+							alt="Preview"
+							className="w-full h-96 object-contain"
+						/>
+						<div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+							<Button
+								size="icon"
+								variant="secondary"
+								onClick={handleOpenPicker}
+								type="button"
+							>
+								<Upload className="h-4 w-4" />
+							</Button>
+							<Button
+								size="icon"
+								variant="destructive"
+								onClick={handleRemove}
+								type="button"
+							>
+								<Trash2 className="h-4 w-4" />
+							</Button>
+						</div>
+					</div>
+				) : (
+					<Button
+						variant="outline"
+						className="relative w-full h-64 border-2 border-dashed hover:border-primary/50"
+						onClick={handleOpenPicker}
+						type="button"
+					>
+						<div className="flex flex-col items-center gap-4">
+							<div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+								<Upload className="h-8 w-8 text-primary" />
+							</div>
+							<div className="text-center">
+								<p className="font-medium text-lg">Click để tải lên hình ảnh</p>
+								<p className="text-sm text-muted-foreground mt-1">
+									JPG, PNG, WebP • Tối đa 10MB
+								</p>
+							</div>
+						</div>
+					</Button>
+				)}
+
+				<input
+					ref={fileInputRef}
+					type="file"
+					accept="image/*"
+					className="hidden"
+					onChange={handleFileSelect}
+				/>
+			</div>
+		);
+	};
+
+	if (loading && isEditing && !attributesLoaded) {
+		return (
+			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
+				<div className="text-gray-500">Đang tải...</div>
+			</div>
+		);
+	}
+
+	const currentAttributeIds = watch("attribute")
+		? JSON.parse(watch("attribute")).attribute_ids
+		: [];
+
+	return (
+		<div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+			<div className="w-full space-y-6">
+				<div className="flex items-center gap-4">
+					<Button
+						variant="outline"
+						onClick={() => navigate("/admin/products")}
+						className="flex items-center gap-2 h-12 px-6 text-base"
+					>
+						<ArrowLeft className="h-4 w-4" />
+						Quay lại
+					</Button>
+					<h1 className="text-2xl font-bold text-black">
+						{isEditing ? "Sửa sản phẩm" : "Thêm sản phẩm mới"}
+					</h1>
+				</div>
+
+				<form onSubmit={handleSubmit(onSubmit)}>
+					<Card className="border shadow-sm bg-white w-full">
+						<CardContent className="space-y-8">
+							<div className="space-y-6">
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									<div>
+										<Label>Ngôn ngữ *</Label>
+										<Select value={watch("lang_id")?.toString()} disabled>
+											<SelectTrigger className="mt-2 w-full !h-[48px] text-base">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												{languages.map((lang) => (
+													<SelectItem
+														key={lang.id}
+														value={lang.id.toString()}
+														className="text-base py-2"
+													>
+														{lang.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+									<div>
+										<Label>Tên sản phẩm *</Label>
+										<Input
+											{...register("name", { required: true })}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div>
+										<Label>Tác giả</Label>
+										<Input
+											{...register("author")}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div className="md:col-span-2 lg:col-span-3">
+										<Label>Mô tả</Label>
+										<Input
+											{...register("desc")}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div className="md:col-span-2 lg:col-span-3">
+										<Label>Nội dung chi tiết *</Label>
+										<div className="mt-2">
+											<ReactQuill
+												theme="snow"
+												value={watch("content")}
+												onChange={(value: any) =>
+													setValue("content", value || "")
+												}
+												modules={modules}
+												className="mt-2"
+												style={{ height: "300px" }}
+											/>
+										</div>
+									</div>
+									<div className="md:col-span-2 lg:col-span-3 mt-10">
+										<Label>Hình ảnh chính</Label>
+										<div className="mt-4">
+											<ImagePreview
+												src={watch("image")}
+												onChange={(file) => setValue("image", file)}
+												onRemove={() => {
+													if (isEditing && typeof watch("image") === "string") {
+														setValue("image", "");
+													}
+												}}
+											/>
+										</div>
+									</div>
+									<div>
+										<Label>URL</Label>
+										<Input
+											{...register("url")}
+											className="mt-2 h-12 text-base"
+											placeholder="product-url"
+										/>
+									</div>
+									<div>
+										<Label>Thứ tự hiển thị</Label>
+										<Input
+											type="number"
+											{...register("order", { valueAsNumber: true })}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div>
+										<Label>Trạng thái *</Label>
+										<Select
+											value={watch("status")}
+											onValueChange={(val) => setValue("status", val)}
+										>
+											<SelectTrigger className="mt-2 w-full !h-[48px] text-base">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="active" className="text-base py-2">
+													Active
+												</SelectItem>
+												<SelectItem value="inactive" className="text-base py-2">
+													Inactive
+												</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
+							</div>
+
+							<div className="space-y-6">
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									<div className="lg:col-span-2">
+										<Label>SEO Title</Label>
+										<Input
+											{...register("seotitle")}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div>
+										<Label>Giá gốc ($)</Label>
+										<Input
+											type="number"
+											step="0.01"
+											{...register("price", { valueAsNumber: true })}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div className="lg:col-span-2">
+										<Label>SEO Description</Label>
+										<Input
+											{...register("seodesc")}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+									<div>
+										<Label>Giá khuyến mãi ($)</Label>
+										<Input
+											type="number"
+											step="0.01"
+											{...register("saleprice", { valueAsNumber: true })}
+											className="mt-2 h-12 text-base"
+										/>
+									</div>
+								</div>
+							</div>
+
+							<div className="space-y-6">
+								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+									<Card className="p-6 shadow-sm border border-gray-200 rounded-lg w-full">
+										<div className="flex items-center gap-2 mb-4">
+											<Layers className="h-5 w-5 text-gray-600" />
+											<h3 className="font-semibold text-lg text-black">
+												Chọn danh mục
+											</h3>
+										</div>
+										<Select
+											onValueChange={(v) => {
+												const current = watch("categories") || [];
+												const catId = Number(v);
+												if (!current.includes(catId)) {
+													setValue("categories", [...current, catId]);
+													const available = getAvailableAttributes().map(
+														(a) => a.id
+													);
+													const currAttr = watch("attribute")
+														? JSON.parse(watch("attribute")).attribute_ids
+														: [];
+													setValue(
+														"attribute",
+														JSON.stringify({
+															attribute_ids: currAttr.filter((id: number) =>
+																available.includes(id)
+															)
+														})
+													);
+												}
+											}}
+										>
+											<SelectTrigger className="mt-2 w-full !h-[48px] text-base border-gray-300">
+												<SelectValue placeholder="Chọn danh mục..." />
+											</SelectTrigger>
+											<SelectContent>
+												{categories
+													.filter(
+														(c) =>
+															!watch("categories")?.includes(c.id) &&
+															c.lang_id === selectedLangId
+													)
+													.map((cat) => (
+														<SelectItem
+															key={cat.id}
+															value={cat.id.toString()}
+															className="text-base py-2"
+														>
+															{cat.name}
+														</SelectItem>
+													))}
+											</SelectContent>
+										</Select>
+										<div className="mt-4">
+											<h4 className="font-medium mb-2 text-black">
+												Danh mục đã chọn:
+											</h4>
+											<ScrollArea className="h-[200px] pr-4">
+												<div className="flex flex-wrap gap-2">
+													{watch("categories")?.length === 0 ? (
+														<p className="text-gray-400 text-sm">
+															Chưa chọn danh mục nào
+														</p>
+													) : (
+														watch("categories")?.map((catId) => {
+															const cat = categories.find(
+																(c) =>
+																	c.id === catId && c.lang_id === selectedLangId
+															);
+															return cat ? (
+																<Badge
+																	key={catId}
+																	variant="outline"
+																	className="flex items-center gap-2 px-3 py-2 border-gray-300 text-black hover:bg-gray-100 text-base"
+																>
+																	<span>{cat.name}</span>
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="sm"
+																		className="h-6 w-6 p-0 hover:bg-red-100"
+																		onClick={() => {
+																			const current = watch("categories") || [];
+																			setValue(
+																				"categories",
+																				current.filter((id) => id !== catId)
+																			);
+																			const available =
+																				getAvailableAttributes().map(
+																					(a) => a.id
+																				);
+																			const currAttr = watch("attribute")
+																				? JSON.parse(watch("attribute"))
+																						.attribute_ids
+																				: [];
+																			setValue(
+																				"attribute",
+																				JSON.stringify({
+																					attribute_ids: currAttr.filter(
+																						(id: number) =>
+																							available.includes(id)
+																					)
+																				})
+																			);
+																		}}
+																	>
+																		<Trash2 className="h-4 w-4 text-red-500" />
+																	</Button>
+																</Badge>
+															) : null;
+														})
+													)}
+												</div>
+											</ScrollArea>
+										</div>
+									</Card>
+
+									<Card className="p-6 shadow-sm border border-gray-200 rounded-lg w-full">
+										<div className="flex items-center gap-2 mb-4">
+											<Palette className="h-5 w-5 text-gray-600" />
+											<h3 className="font-semibold text-lg text-black">
+												Chọn thuộc tính
+											</h3>
+										</div>
+										<Select
+											onValueChange={(v) => handleAttributeChange(Number(v))}
+											disabled={watch("categories")?.length === 0}
+										>
+											<SelectTrigger className="mt-2 w-full !h-[48px] text-base border-gray-300">
+												<SelectValue
+													placeholder={
+														currentAttributeIds.length > 0
+															? `${currentAttributeIds.length} thuộc tính đã chọn`
+															: "Chọn thuộc tính..."
+													}
+												/>
+											</SelectTrigger>
+											<SelectContent>
+												{(() => {
+													const available = getAvailableAttributes();
+													return available.length > 0 ? (
+														available
+															.filter(
+																(attr) => !currentAttributeIds.includes(attr.id)
+															)
+															.map((attr) => (
+																<SelectItem
+																	key={attr.id}
+																	value={attr.id.toString()}
+																	className="text-base py-2"
+																>
+																	{attr.name}
+																</SelectItem>
+															))
+													) : (
+														<SelectItem
+															value="none"
+															disabled
+															className="text-gray-400"
+														>
+															Không có thuộc tính nào cho danh mục đã chọn
+														</SelectItem>
+													);
+												})()}
+											</SelectContent>
+										</Select>
+										<div className="mt-4">
+											<h4 className="font-medium mb-2 text-black">
+												Thuộc tính đã chọn:
+											</h4>
+											<ScrollArea className="h-[200px] pr-4">
+												<div className="flex flex-wrap gap-2">
+													{currentAttributeIds.length === 0 ? (
+														<p className="text-gray-400 text-sm">
+															Chưa chọn thuộc tính nào
+														</p>
+													) : (
+														currentAttributeIds.map((attrId: number) => {
+															const attr = attributes.find(
+																(a) => a.id === attrId
+															);
+															return attr ? (
+																<Badge
+																	key={attrId}
+																	variant="outline"
+																	className="flex items-center gap-2 px-3 py-2 border-gray-300 text-black hover:bg-gray-100 text-base"
+																>
+																	<span>{attr.name}</span>
+																	<Button
+																		type="button"
+																		variant="ghost"
+																		size="sm"
+																		className="h-6 w-6 p-0 hover:bg-red-100"
+																		onClick={() =>
+																			handleAttributeChange(attrId)
+																		}
+																	>
+																		<Trash2 className="h-4 w-4 text-red-500" />
+																	</Button>
+																</Badge>
+															) : null;
+														})
+													)}
+												</div>
+											</ScrollArea>
+										</div>
+									</Card>
+								</div>
+							</div>
+
+							<div className="space-y-6">
+								<div className="flex justify-between items-center">
+									<Label className="text-lg">Hình ảnh phụ</Label>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={handleAddSubProduct}
+										className="flex items-center gap-2 h-12 px-6 text-base"
+									>
+										<Plus className="h-4 w-4" />
+										Thêm hình ảnh
+									</Button>
+								</div>
+								<div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+									{fields.map((field, index) => (
+										<Card key={field.id} className="border shadow-sm w-full">
+											<CardHeader className="bg-gray-50 border-b py-4 px-6">
+												<div className="flex justify-between items-center">
+													<h4 className="font-bold text-black">
+														Hình ảnh #{index + 1}
+													</h4>
+													{fields.length > 1 && (
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															className="text-red-600 hover:bg-red-50"
+															onClick={() => remove(index)}
+														>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													)}
+												</div>
+											</CardHeader>
+											<CardContent className="p-6">
+												<div className="space-y-6">
+													<div>
+														<Label>Tiêu đề</Label>
+														<Input
+															{...register(`subProducts.${index}.title`)}
+															className="mt-2 h-12 text-base"
+														/>
+													</div>
+													<div>
+														<Label>Hình ảnh</Label>
+														<div className="mt-4">
+															<ImagePreview
+																src={watch(`subProducts.${index}.image`)}
+																onChange={(file) =>
+																	setValue(`subProducts.${index}.image`, file)
+																}
+																onRemove={() => {
+																	const current = watch(
+																		`subProducts.${index}.image`
+																	);
+																	if (typeof current === "string" && current) {
+																		setValue(`subProducts.${index}.image`, "");
+																	}
+																}}
+															/>
+														</div>
+													</div>
+												</div>
+											</CardContent>
+										</Card>
+									))}
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+
+					<div className="flex justify-end gap-4 mt-6">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => navigate("/admin/products")}
+							disabled={loading}
+							className="h-12 px-6 text-base"
+						>
+							Hủy
+						</Button>
+						<Button
+							type="submit"
+							disabled={loading}
+							className="bg-black text-white hover:bg-gray-800 h-12 px-6 text-base"
+						>
+							<Save className="h-4 w-4 mr-2" />
+							{loading ? "Đang lưu..." : isEditing ? "Cập nhật" : "Tạo mới"}
+						</Button>
+					</div>
+				</form>
+			</div>
+		</div>
+	);
+};
+
+export default ProductForm;
