@@ -3,10 +3,13 @@
 use App\Http\Controllers\Admin\AttributeController;
 use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CategoryController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FooterController;
 use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\LanguageItemController;
 use App\Http\Controllers\Admin\LanguageKeyController;
 use App\Http\Controllers\Admin\MenuController;
+use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\PromotionSubscriberController;
 use App\Http\Controllers\Admin\ReviewController;
@@ -17,32 +20,80 @@ use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
+use App\Http\Controllers\Shopping\BannerController as ShoppingBannerController;
+use App\Http\Controllers\Shopping\CartController;
+use App\Http\Controllers\Shopping\FooterController as ShoppingFooterController;
+use App\Http\Controllers\Shopping\LanguageController as ShoppingLanguageController;
+use App\Http\Controllers\Shopping\MenuController as ShoppingMenuController;
+use App\Http\Controllers\Shopping\OrderController as ShoppingOrderController;
+use App\Http\Controllers\Shopping\PaymentController;
+use App\Http\Controllers\Shopping\ProductController as ShoppingProductController;
+use App\Http\Controllers\Shopping\ReviewController as ShoppingReviewController;
 
 
+
+Route::get('/shopping/menus', [ShoppingMenuController::class, 'index']);
+Route::get('/shopping/languages', [ShoppingLanguageController::class, 'index']);
+Route::get('/shopping/languages/get/', [ShoppingLanguageController::class, 'get']);
+Route::get('/shopping/banners', [ShoppingBannerController::class, 'index']);
+Route::get('/shopping/footers', [ShoppingFooterController::class, 'index']);
+Route::get('/shopping/products', [ShoppingProductController::class, 'index']);
+Route::get('/shopping/products/{id}', [ShoppingProductController::class, 'show']);
+Route::get('/shopping/dual-category-products', [ShoppingProductController::class, 'getDualCategoryProducts']);
+Route::get('/shopping/getCategory', [ShoppingProductController::class, 'getCategory']);
+Route::get('/products/recently-viewed', [ShoppingProductController::class, 'recentlyViewed']);
+Route::post('/promotion/subscribe', [PromotionSubscriberController::class, 'store']);
+Route::get('/shopping/products/{id}/related', [ShoppingProductController::class, 'getRelatedProducts']);
+// ========== SHOPPING REVIEW ROUTES (Public) ==========
+Route::prefix('shopping')->group(function () {
+    // Review routes - Public (không cần đăng nhập)
+    Route::get('/products/{productId}/reviews', [ShoppingReviewController::class, 'getProductReviews']);
+    Route::get('/products/{productId}/reviews/stats', [ShoppingReviewController::class, 'getProductRatingStats']);
+});
+// ================= AUTH ROUTES =================
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
     Route::post('/login', [AuthController::class, 'login'])->name('auth.login');
+});
+Route::prefix('payment')->group(function () {
+    Route::post('/paypal/create', [PaymentController::class, 'createPayPalPayment'])->middleware('auth:sanctum');
+
+    // 2 route này KHÔNG cần auth, PayPal gọi trực tiếp
+    Route::get('/paypal/success', [PaymentController::class, 'paypalSuccess']);
+    Route::get('/paypal/cancel', [PaymentController::class, 'paypalCancel']);
 });
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
     Route::get('/auth/check-auth', [AuthController::class, 'checkAuth'])->name('auth.check');
     Route::get('/auth/profile', [AuthController::class, 'getProfile']);
     Route::get('/auth/orders', [AuthController::class, 'getOrders']);
+    Route::apiResource('orders', OrderController::class);
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+    Route::post('/auth/upload-avatar', [AuthController::class, 'uploadAvatar']);
     Route::get('/auth/shipping-addresses', [AuthController::class, 'getShippingAddress']);
     Route::post('/auth/shipping-addresses', [AuthController::class, 'addShippingAddress']);
     Route::put('/auth/shipping-addresses/{id}', [AuthController::class, 'updateShippingAddress']);
     Route::delete('/auth/shipping-addresses/{id}', [AuthController::class, 'deleteShippingAddress']);
+    Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus']);
+    Route::get('/admin/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+    Route::delete('/admin/orders/bulk-destroy', [OrderController::class, 'bulkDestroy']);
+    Route::delete('/admin/orders/{order}', [OrderController::class, 'destroy']);
+    // ========== SHOPPING REVIEW ROUTES (User) ==========
+    Route::prefix('shopping')->group(function () {
+        Route::get('/products/{productId}/can-review', [ShoppingReviewController::class, 'canReviewProduct']);
+        Route::post('/products/{productId}/reviews', [ShoppingReviewController::class, 'createReview']);
+        Route::get('/products/{productId}/user-review', [ShoppingReviewController::class, 'getUserProductReview']);
+        Route::put('/reviews/{id}', [ShoppingReviewController::class, 'updateReview']);
+        Route::delete('/reviews/{id}', [ShoppingReviewController::class, 'deleteReview']);
+    });
+    // Footers
+    Route::prefix('footers')->group(function () {
+        Route::get('/', [FooterController::class, 'index']);
+        Route::post('/', [FooterController::class, 'store']);
+        Route::get('/{id}', [FooterController::class, 'show']);
+        Route::put('/{id}', [FooterController::class, 'update']);
+        Route::delete('/{id}', [FooterController::class, 'destroy']);
+    });
     //Banner
     Route::prefix('banners')->group(function () {
         Route::get('/', [BannerController::class, 'index'])->name('banners.index');
@@ -87,6 +138,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}', [RoleController::class, 'update'])->name('roles.update');
         Route::delete('/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
         Route::post('/delete-multiple', [RoleController::class, 'destroyMultiple'])->name('roles.destroyMultiple');
+    });
+    Route::middleware(['auth:sanctum', 'web'])->group(function () {
+        Route::post('/shopping/apply-coupon', [ShoppingOrderController::class, 'applyCoupon']);
+        Route::post('/shopping/order', [ShoppingOrderController::class, 'store']);
+        Route::post('/shopping/cart', [CartController::class, 'store']);
+        Route::get('/shopping/cart', [CartController::class, 'index']);
+        Route::put('/shopping/cart/{id}', [CartController::class, 'update']);
+        Route::delete('/shopping/cart/{id}', [CartController::class, 'destroy']);
+        Route::get('/shopping/order/{order_id}', [ShoppingOrderController::class, 'show']);
     });
     // Users
     Route::prefix('users')->group(function () {
